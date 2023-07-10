@@ -1,0 +1,536 @@
+---
+title: "Iniciação Científica"
+author: "Pedro Pietrafesa"
+date: "4/3/2021"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Análise prévia dos dados
+
+# Base de Dados
+```{r}
+library(readxl)
+IC <- read_excel("~/Library/Mobile Documents/com~apple~CloudDocs/Documents/Graduação Estatísitca/Iniciação Cinetífica/IC.xlsx")
+
+
+```
+
+# Análise descritiva dos dados
+
+
+```{r}
+
+attach(IC)
+
+
+library(robustbase)
+
+pairs(IC[-1])
+
+
+adjbox(idm, main = "Índice de Desempenho Municipal")
+adjbox(orc, main = "Orçamento")
+adjbox(pibpercapita,main = " PIB per Capita")
+adjbox(matriculas,main = "Matrículas no Município")
+adjbox(telnet,main = "Acesso a telefone e rede móvel")
+adjbox(medicoporhab,main = "Médicos por 1000 Habitantes")
+adjbox(empregoformal,main = "Empregos Formais nos Municípios")
+
+
+library(ggplot2)
+
+par(mfrow = c(2,2))
+
+ggplot(IC, aes(x = IC$idm)) + 
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density()
+
+ggplot(IC, aes(x = IC$orc)) + 
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density()
+
+ggplot(IC, aes(x = IC$pibpercapita)) + 
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density()
+
+ggplot(IC, aes(x = IC$matriculas)) + 
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density()
+
+ggplot(IC, aes(x = IC$telnet)) + 
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density()
+
+ggplot(IC, aes(x = IC$medicoporhab)) + 
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density()
+
+
+ggplot(IC, aes(x = IC$empregoformal)) + 
+  geom_histogram(aes(y = ..density..)) + 
+  geom_density()
+
+par(mfrow = c(1,1))
+
+par(mfrow = c(2,2))
+
+plot(idm~orc, data=IC)
+abline(lm(idm~orc, data=IC), col=2, lwd = 2)
+plot(idm~pibpercapita, data=IC)
+abline(lm(idm~pibpercapita, data=IC), col=2, lwd = 2)
+plot(idm~matriculas, data=IC)
+abline(lm(idm~matriculas, data=IC), col=2, lwd = 2)
+plot(idm~telnet, data=IC)
+abline(lm(idm~telnet, data=IC), col=2, lwd = 2)
+plot(idm~medicoporhab, data=IC)
+abline(lm(idm~medicoporhab, data=IC), col=2, lwd = 2)
+plot(idm~empregoformal, data=IC)
+abline(lm(idm~empregoformal, data=IC), col=2, lwd = 2)
+
+
+par(mfrow = c(1,1))
+
+
+library(stargazer)
+stargazer(IC, summary = T,median = T,type = "text",digits = 2)
+
+
+round(cor(IC[-1], method = "pearson"),2)
+corre <- cor(IC[c(-1,-9)])
+
+
+library(ggcorrplot)
+ggcorrplot(round(cor(IC[-1]),2),lab = TRUE)
+
+
+(prelim_plot <- ggplot(IC, aes(x = orc, y = idm)) +
+  geom_point() +
+  geom_smooth(method = "lm"))
+
+(prelim_plot <- ggplot(IC, aes(x = pibpercapita, y = idm)) +
+  geom_point() +
+  geom_smooth(method = "lm"))
+
+(prelim_plot <- ggplot(IC, aes(x = matriculas, y = idm)) +
+  geom_point() +
+  geom_smooth(method = "lm"))
+
+(prelim_plot <- ggplot(IC, aes(x = telnet, y = idm)) +
+  geom_point() +
+  geom_smooth(method = "lm"))
+
+(prelim_plot <- ggplot(IC, aes(x = medicoporhab, y = idm)) +
+  geom_point() +
+  geom_smooth(method = "lm"))
+
+(prelim_plot <- ggplot(IC, aes(x = empregoformal, y = idm)) +
+  geom_point() +
+  geom_smooth(method = "lm"))
+
+
+
+
+
+library(tseries)
+shapiro.test(IC$idm)
+jarque.bera.test(IC$idm)
+
+
+```
+
+
+# Teste inicial de regressão linear
+
+```{r}
+IC1 <- IC[-1]
+
+fit1 = lm(idm ~.,data = IC1)
+summary(fit1)
+
+stargazer(fit1,type = "text")
+```
+
+# Escolha do melhor modelo de regressão linear
+
+```{r}
+require(MASS)
+fit2 = stepAIC(fit1, trace = F)
+summary(fit2)
+```
+
+# Análise de normalidade
+
+```{r}
+fit.model <- fit2
+attach(IC)
+
+
+par(mfrow=c(1,1))
+X <- model.matrix(fit.model)
+n <- nrow(X)
+p <- ncol(X)
+H <- X%*%solve(t(X)%*%X)%*%t(X)
+h <- diag(H)
+si <- lm.influence(fit.model)$sigma
+r <- resid(fit.model)
+tsi <- r/(si*sqrt(1-h))
+#
+ident <- diag(n)
+epsilon <- matrix(0,n,100)
+e <- matrix(0,n,100)
+e1 <- numeric(n)
+e2 <- numeric(n)
+#
+for(i in 1:100){
+     epsilon[,i] <- rnorm(n,0,1)
+     e[,i] <- (ident - H)%*%epsilon[,i]
+     u <- diag(ident - H)
+     e[,i] <- e[,i]/sqrt(u)
+     e[,i] <- sort(e[,i]) }
+#
+for(i in 1:n){
+     eo <- sort(e[i,])
+     e1[i] <- (eo[2]+eo[3])/2
+     e2[i] <- (eo[97]+eo[98])/2 }
+#
+med <- apply(e,1,mean)
+faixa <- range(tsi,e1,e2)
+#
+par(pty="s")
+qqnorm(tsi,xlab="Percentil da N(0,1)",
+ylab="Residuo Studentizado", ylim=faixa, pch=16, main="",cex=2,cex.axis=1.5,cex.lab=1.5)
+par(new=TRUE)
+qqnorm(e1,axes=F,xlab="",ylab="",type="l",ylim=faixa,lty=1, main="",cex=2)
+par(new=TRUE)
+qqnorm(e2,axes=F,xlab="",ylab="", type="l",ylim=faixa,lty=1, main="",cex=2)
+par(new=TRUE)
+qqnorm(med,axes=F,xlab="",ylab="",type="l",ylim=faixa,lty=2, main="",cex=2)
+plot(fit.model, which = 2)
+
+
+shapiro.test(fit2$residuals)
+tseries::jarque.bera.test(fit2$residuals)
+```
+
+# Análise de pontos de influência
+
+```{r}
+fit.model <- fit2
+attach(IC)
+
+X <- model.matrix(fit.model)
+n <- nrow(X)
+p <- ncol(X)
+H <- X%*%solve(t(X)%*%X)%*%t(X)
+h <- diag(H)
+r <- resid(fit.model)
+s <- sqrt(sum(r*r)/(n-p))
+ts <- r/(s*sqrt(1-h))
+di <- (1/p)*(h/(1-h))*(ts^2)
+si <- lm.influence(fit.model)$sigma
+tsi <- r/(si*sqrt(1-h))
+a <- max(tsi)
+b <- min(tsi)
+ccplot(fitted(fit.model),tsi,xlab="Valor Ajustado", ylab="Resíduo Studentizado", 
+ylim=c(b-1,a+1), pch=16,lwd=2)
+
+plot(fit.model, which = 1)
+
+```
+
+
+
+# Distância Cook
+
+```{r}
+fit.model <- fit2
+attach(IC)
+
+X <- model.matrix(fit.model)
+n <- nrow(X)
+p <- ncol(X)
+H <- X%*%solve(t(X)%*%X)%*%t(X)
+h <- diag(H)
+r <- resid(fit.model)
+s <- sqrt(sum(r*r)/(n-p))
+ts <- r/(s*sqrt(1-h))
+di <- (1/p)*(h/(1-h))*(ts^2)
+si <- lm.influence(fit.model)$sigma
+tsi <- r/(si*sqrt(1-h))
+a <- max(tsi)
+b <- min(tsi)
+#
+plot(di,xlab="Indice", ylab="Distancia de Cook",lwd=2)
+cut = mean(di) + 3*sd(di)
+abline(cut,0,lty=2,lwd=2)
+identify(di,n=1,lwd=2)
+```
+
+#DFFITS
+
+```{r}
+fit.model <- fit2
+attach(IC)
+
+X <- model.matrix(fit.model)
+n <- nrow(X)
+p <- ncol(X)
+H <- X%*%solve(t(X)%*%X)%*%t(X)
+h <- diag(H)
+r <- resid(fit.model)
+s <- sqrt(sum(r*r)/(n-p))
+ts <- r/(s*sqrt(1-h))
+di <- (1/p)*(h/(1-h))*(ts^2)
+si <- lm.influence(fit.model)$sigma
+tsi <- r/(si*sqrt(1-h))
+a <- max(tsi)
+b <- min(tsi)
+dffits = abs(tsi)*sqrt(h/(1-h))
+#
+plot(dffits,xlab="Índice", ylab="DFFITS", pch=16,lwd=2)
+cut = 2*sqrt(p/(n-p))
+abline(cut,0,lty=2,lwd=2)
+identify(dffits, n=1,lwd=2)
+
+```
+
+```{r}
+dcook_indices = which(di>0.15)
+IC[dcook_indices,]
+```
+
+
+
+# multicolinearidade
+
+```{r}
+car::vif(fit2)
+```
+
+
+
+# modelos mistos
+
+```{r}
+
+library(lme4)
+library(lattice)
+#library (lmerTest) # Mixed model package by Douglas Bates, comes w/ pvalues! 
+library (texreg) #Helps us make tables of the mixed models
+library (afex) # Easy ANOVA package to compare model fits
+library (plyr) # Data manipulator package
+library (ggplot2) # GGplot package for visualizing data
+library(ggeffects)
+library(nlme)
+#library(LMERConvenienceFunctions)
+library(tidyverse)
+library(panelr)
+
+
+# Análise descritiva gráfico de perfis individuais 
+painel <- panel_data(IC, id = Localidade, wave = ano)
+painel %>% 
+line_plot(idm, 
+          add.mean = TRUE, 
+          alpha = 0.2)
+
+
+# Escolha do efeito aleatório
+nullmodel1 <- lme(idm ~ 1, random =   ~ 1 | Localidade, data = IC, method = "ML")
+nullmodel2 <- lme(idm ~ 1, random = list(ano = ~1, Localidade = ~1), data = IC, method = "ML")
+nullmodel3 <- lme(idm ~ 1, random = ~ 1 | ano , data = IC, method = "ML")
+nullmodel4 <- lme(idm ~ 1, random =  ~ 1|Localidade/ano , data = IC, method = "ML")
+nullmodel5 <- lme(idm ~ 1, random =  ~ ano|Localidade , data = IC, method = "ML")
+
+AIC(nullmodel1)
+AIC(nullmodel2)
+AIC(nullmodel3)
+AIC(nullmodel4)
+AIC(nullmodel5)
+
+
+# Escolha do modelo 1
+
+modelo1 <- lme(idm ~ orc + pibpercapita + matriculas + telnet + medicoporhab + empregoformal, random = ~ ano|Localidade,  data = IC, method = "ML")
+summary(modelo1)
+
+qqnorm(resid(modelo1))
+qqline(resid(modelo1))
+
+library(RVAideMemoire)
+
+plotresid(modelo1, shapiro = T)
+
+library(ggResidpanel)
+
+resid_panel(modelo1, plots = c("hist", "qq"), qqbands = TRUE)
+
+
+# Modelo 2
+modelo2 <- lme(idm ~ orc + pibpercapita  + telnet + matriculas + medicoporhab + empregoformal, random = ~ 1|Localidade,  data = IC, method = "ML")
+summary(modelo2)
+
+library(RVAideMemoire)
+
+plotresid(modelo2, shapiro = T)
+
+
+# Modelo 3
+modelo3 <- lme(idm ~ orc + pibpercapita  + telnet + matriculas + medicoporhab + empregoformal, random = list(ano = ~1, Localidade = ~1),  data = IC, method = "ML")
+summary(modelo3)
+
+library(RVAideMemoire)
+
+plotresid(modelo3, shapiro = T)
+
+
+# modelo 4
+modelo4 <- lme(idm ~ orc + pibpercapita  + telnet + matriculas + medicoporhab + empregoformal, random = ~ 1|ano,  data = IC, method = "ML")
+summary(modelo4)
+
+# Modelo 5
+modelo5 <- lme(idm ~ orc + pibpercapita  + telnet + matriculas + medicoporhab + empregoformal, random = ~ 1|Localidade/ano,  data = IC, method = "ML")
+summary(modelo5)
+
+
+
+library(RVAideMemoire)
+
+plotresid(modelo5, shapiro = T)
+
+
+
+AIC(modelo3)
+AIC(modelo4)
+AIC(modelo5)
+AIC(modelo6)
+AIC(modelo7)
+
+
+```
+
+
+# Informações do modelo selecionado 
+
+```{r}
+
+# Modelo 1
+
+painel %>% 
+line_plot(idm, 
+        add.mean = TRUE, 
+        alpha = 0.2)
+
+
+modelo1 <- lme(idm ~ orc + pibpercapita + matriculas + telnet + medicoporhab + empregoformal, random = ~ ano|Localidade,  data = IC, method = "ML")
+summary(modelo1)
+mu.est
+
+
+qqnorm(resid(modelo1))
+qqline(resid(modelo1))
+
+library(RVAideMemoire)
+
+plotresid(modelo1, shapiro = T)
+
+library(ggResidpanel)
+
+resid_panel(modelo1, plots = c("hist", "resid", "qq", "index"), qqbands = TRUE)
+
+VarCorr(modelo1)
+getVarCov(modelo1)
+
+
+
+```
+
+
+```{r}
+
+library(xtable)
+
+xtable(anova (nullmodel1,nullmodel2,nullmodel3,nullmodel4,nullmodel5))
+
+x <- summary(IC)
+
+xtable(corre)
+
+anova (nullmodel1,nullmodel2,nullmodel3,nullmodel4,nullmodel5)
+
+```
+
+
+
+```{r}
+#modelo1 <- lmer(idm ~ orc + pibpercapita + matriculas + telnet + medicoporhab + empregoformal + (1|Localidade), data = IC, REML = FALSE)
+#summary(modelo1)
+#anova(modelo1)
+#coef(modelo1)
+#ranef(modelo1)
+#qqmath(ranef(modelo1))
+
+#modelo1.1 <- lmer(idm ~ orc + pibpercapita + matriculas + telnet  + empregoformal + (1|Localidade) + (1|ano), data = IC)
+#summary(modelo1.1)
+#?pvalues
+
+#modelo2 <- lmer(idm ~ orc + pibpercapita + matriculas + telnet + medicoporhab + empregoformal + (1|Localidade), data = IC)
+#summary(modelo2)
+#anova(modelo2)
+#coef(modelo2)
+#ranef(modelo2)
+#qqmath(ranef(modelo2))
+
+modelo2.2 <- lmer(idm ~ orc + pibpercapita + matriculas + telnet + medicoporhab + empregoformal +  (1|ano) , data = IC)
+summary(modelo2.2)
+
+
+m<-lmerTest::lmer(idm ~ orc + pibpercapita + matriculas + telnet + medicoporhab + empregoformal +  (1|ano) , data = IC)
+summary(m)
+
+#sjPlot:: tab_model(modelo1)
+#sjPlot:: tab_model(modelo2)
+#sjPlot:: tab_model(modelo2.2)
+#sjPlot:: tab_model(modelo1.1)
+
+
+
+#sjPlot::plot_model(modelo1, 
+                #   axis.labels=c("orc", "pibpercapita", "matriculas", "telnet", "medicoporhab", "empregoformal"),
+                 #  show.values=TRUE, show.p=TRUE,
+                  # title="Efeitos das Variáveis no IDM")
+#sjPlot::plot_model(modelo2, 
+                 #  axis.labels=c("orc", "pibpercapita", "matriculas", "telnet", "medicoporhab", "empregoformal"),
+                 #  show.values=TRUE, show.p=TRUE,
+                 # title="Efeitos das Variáveis no IDM")
+
+#sjPlot::plot_model(modelo1.1, 
+                 #  axis.labels=c("orc", "pibpercapita", "matriculas", "telnet", "medicoporhab", "empregoformal"),
+                  # show.values=TRUE, show.p=TRUE,
+                  # title="Efeitos das Variáveis no IDM")
+#sjPlot::plot_model(modelo2.2, 
+                 #  axis.labels=c("orc", "pibpercapita", "matriculas", "telnet", "medicoporhab", "empregoformal"),
+                 #  show.values=TRUE, show.p=TRUE,
+                 #  title="Efeitos das Variáveis no IDM")
+
+
+
+library(lattice)
+xyplot(idm~ano|Localidade, layout=c(4,4), data=IC, panel=function(x, y, subscripts) {
+panel.xyplot(x, y, type='l', col='grey70')
+panel.lines(x, predict(modelo1, level=0)[subscripts], col=1, lwd=2)
+panel.lines(x, predict(modelo1, level=1)[subscripts], col=2, lty=2)
+}, key=list(x=.5, y=.95, origin=c(0,0), text=list(c('raw data', 'population average', 'subject-specific'), cex=.9), lines=list(col=c('grey70',1,2), lwd=c(1,2,1), lty=c(1,1,2))))
+
+
+
+```
+
+
