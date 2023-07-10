@@ -1,0 +1,219 @@
+---
+title: "Untitled"
+author: "Pedro Pietrafesa"
+date: "6/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+foo <- function(x){
+  for( i in x ){
+    #  require returns TRUE invisibly if it was able to load package
+    if( ! require( i , character.only = TRUE ) ){
+      #  If package was not able to be loaded then re-install
+      install.packages( i , dependencies = TRUE )
+      #  Load package after installing
+      require( i , character.only = TRUE )
+    }
+  }
+}
+packages <- c("readxl", "tidyverse", "magrittr", "ggcorrplot", "factoextra", "reshape2",
+              "qgraph", "nortest", "agricolae", "GPArotation", "psych", "data.table",
+              "wesanderson", "ggplot2", "ggmap", "maps", "mapdata", "ggrepel", "ggsn", "tmap")
+
+foo(packages)
+
+install.packages("cowplot")
+install.packages("ggspatial")
+install.packages("electionsBR")
+install.packages("rgdal")
+install.packages("geobr")
+
+
+library(tidyverse)
+library(electionsBR)
+library(ggmap)
+library(rgdal)
+library(stringi)
+library(scales)
+library(maptools)
+library(RColorBrewer)
+library(geobr)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(ggspatial)
+library(cowplot)
+library(tmap)
+library(broom)
+library(rgeos)
+library(raster)
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r, fig.height = 4}
+
+
+IC_2012 <- read_excel("~/Downloads/IC_2012.xlsx")
+
+
+library(rgdal)
+goias <- readOGR("~/Downloads/go_municipios", "52MUE250GC_SIR")
+
+summary(goias)
+# diminuindo o número de dígitos no código dos municípios para igualar com as bases de dados
+
+goias$CD_GEOCMU <- substr(goias$CD_GEOCMU,1,6)
+
+# Criar uma coluna com os códigos dos municípios na tabela 
+IC_2012$CD_GEOCMU <- substr(IC_2012$CD_MUNICIPIO, 1,6)
+
+#transformar os códigos dos municípios em númerico para juntar com o SHAPEFILE
+transform(IC_2012, CD_GEOCMU = as.numeric(CD_GEOCMU))
+
+#ordenar as variáveis
+
+ic_mapa <- IC_2012[order(IC_2012$CD_GEOCMU),]
+malha_go <- goias@data[order(goias@data$CD_GEOCMU),]
+
+
+
+
+
+
+```
+
+
+```{r}
+
+library(tmap)
+tmap_mode("plot")
+tm_shape(goias)+
+  tm_fill()+
+  tm_borders()
+
+#Une a base de dados da planilha com o mapa pelo nome do município
+
+g2012=merge(goias,IC_2012,by="CD_GEOCMU", all.x=T)
+
+head(g2012@data)
+
+# Plotando o mapa e melhorando a vizualização
+
+tm_shape(g2012)+
+  tm_fill("idm 2012", strectch.mapping=TRUE, 
+              title="IDM 2012")+
+  tm_legend(position=c("left","top"))+
+  tm_compass()+
+  tm_scale_bar()+
+  tm_borders(alpha=.5)
+
+#tmaptools::palette_explorer()
+
+
+
+
+```
+
+```{r}
+
+
+tm_shape(g2012) +
+    tm_polygons(c("idm 2012", "idm 2014", "idm 2016", "idm 2018"), 
+        style=c("kmeans","kmeans", "kmeans", "kmeans"),
+        palette=list("Paired", "Paired", "Paired", "Paired"),
+        strectch.mapping=TRUE,
+        breaks = list(quantile(g2012$`idm 2012`),quantile(g2012$`idm 2014`),quantile(g2012$`idm 2016`),quantile(g2012$`idm 2018`)),
+        title=c("IDM 2012", "IDM 2014", "IDM 2016", "IDM 2018")) +
+tm_compass()+
+tm_scale_bar()+
+tm_legend(legend.format = list(text.separator= "a"))+
+tm_layout(legend.position = c("LEFT","TOP"),
+            legend.frame = FALSE)
+  
+
+
+
+
+
+
+```
+
+```{r}
+
+brasil <- readOGR("~/Downloads/br_unidades_da_federacao", "BRUFE250GC_SIR")
+
+head(brasil)
+
+library(tmap)
+tmap_mode("plot")
+tm_shape(brasil)+
+  tm_fill()+
+  tm_borders()
+
+
+mbrasil <- read_excel("~/Downloads/mapa_brasil.xlsx")
+mbrasil
+
+#Une a base de dados da planilha com o mapa pelo nome do município
+
+m=merge(brasil,mbrasil,by="CD_GEOCUF", all.x=T)
+m
+
+
+
+# Plotando o mapa e melhorando a vizualização
+
+tm_shape(m)+
+  tm_compass()+
+  tm_polygons("NM_REGIAO", palette = "Paired", strectch.mapping=TRUE)+
+  tm_borders(alpha=.5)+
+  tm_scale_bar()+
+  tm_text("Estado", scale = 0.3, col = "black")
+
+````
+
+
+
+
+```{r}
+
+library(readxl)
+IES <- read_excel("~/Downloads/IES.xlsx")
+
+
+go <-  read_municipality(
+  code_muni = "GO", 
+  year= 2020,
+  showProgress = FALSE
+  )
+
+ggplot(go) + geom_sf(aes(fill = IES$IES), color= NA, size=.15) +  scale_fill_distiller(palette = "Paired", name="Número de IES no Município",  limits = c(1,34)) + theme_minimal()
+  
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
